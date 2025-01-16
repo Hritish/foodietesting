@@ -93,7 +93,7 @@ if "selected_restaurant" not in st.session_state:
 # Main content
 st.title(emoji.emojize("Welcome to Foodie :fork_and_knife_with_plate:"))
 st.write("Discover the best restaurants near you based on your preferences.")
-st.write("Made by Hritish."
+st.write("Made by Hritish.")
 
 if st.sidebar.button("Find Restaurants"):
     if zip_code:
