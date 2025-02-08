@@ -5,8 +5,8 @@ import random
 from streamlit_folium import folium_static
 
 # API Keys
-google_api_key = "AIzaSyBRQHdcHck7yZInN-5BDAjd-eKQHOCghfs"
-yelp_api_key = "8V0wD0XaZNVI7vNZ4wBoDyWs_CR7jUemUzrGjlYfB6vnquwXf2fvTKH9-lW-s9F6viimgNrbF8hR-VQlt-f3ZL1cIRvkXfDKftN04GxUOv40TDqjFjiouQOnkjo8ZHYx"
+google_api_key = 
+yelp_api_key = 
 
 
 # Function to fetch latitude and longitude from an address using Google Geocoding API
