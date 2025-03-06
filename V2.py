@@ -18,7 +18,9 @@ cuisines_list = [
 
 dietary_options = ["N/A", "Vegetarian", "Gluten-Free", "Vegan", "Kosher", "Halal", "Other"]
 
-def get_restaurants(location_input, dietary_restrictions=None, budget=None, distance=None, distance_unit='miles', cuisine=None, min_rating=None):
+
+def get_restaurants(location_input, dietary_restrictions=None, budget=None, distance=None, distance_unit='miles',
+                    cuisine=None, min_rating=None):
     g = geocoder.arcgis(location_input)
     if not g.latlng:
         st.error("Invalid location. Please enter a valid address or ZIP code.")
@@ -73,6 +75,7 @@ def get_restaurants(location_input, dietary_restrictions=None, budget=None, dist
 
     return restaurants, random.sample(restaurants, min(len(restaurants), 3))
 
+
 # Sidebar UI
 st.sidebar.header("Search Settings")
 location_input = st.sidebar.text_input("Enter your address or ZIP code:")
@@ -111,7 +114,8 @@ st.write("Discover the best restaurants near you based on your preferences.")
 
 if st.sidebar.button("Find Restaurants"):
     with st.spinner("Searching for restaurants..."):
-        restaurants, top_picks = get_restaurants(location_input, dietary_restrictions, selected_budget, distance, distance_unit, cuisine, min_rating)
+        restaurants, top_picks = get_restaurants(location_input, dietary_restrictions, selected_budget, distance,
+                                                 distance_unit, cuisine, min_rating)
         if not restaurants:
             st.error("No restaurants found. Please try adjusting your filters.")
         else:
@@ -123,14 +127,14 @@ if st.sidebar.button("Find Restaurants"):
                 st.write(f"Address: {restaurant[2]}")
                 st.write(f"Phone: {restaurant[3]}")
                 st.write(f"Categories: {restaurant[4]}")
-                st.write(f"Distance: {restaurant[7]} ft")
 
 if 'top_picks' in locals():
     st.header("Map View")
     g = geocoder.arcgis(location_input)
     if g.latlng:
         m = folium.Map(location=[g.latlng[0], g.latlng[1]], zoom_start=13)
-        folium.Marker(location=[g.latlng[0], g.latlng[1]], popup="You are here", icon=folium.Icon(color="blue")).add_to(m)
+        folium.Marker(location=[g.latlng[0], g.latlng[1]], popup="You are here", icon=folium.Icon(color="blue")).add_to(
+            m)
         for restaurant in top_picks:
             folium.Marker(location=restaurant[5], popup=restaurant[0], icon=folium.Icon(color="green")).add_to(m)
         folium_static(m)
