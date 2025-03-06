@@ -1,235 +1,134 @@
 import requests
+import json
+import geocoder
+import random
 import streamlit as st
 import folium
-import random
 from streamlit_folium import folium_static
+import emoji
 
-# API Keys
-google_api_key = 
-yelp_api_key = 
+# Yelp API Key
+yelp_api_key = "8V0wD0XaZNVI7vNZ4wBoDyWs_CR7jUemUzrGjlYfB6vnquwXf2fvTKH9-lW-s9F6viimgNrbF8hR-VQlt-f3ZL1cIRvkXfDKftN04GxUOv40TDqjFjiouQOnkjo8ZHYx"
 
+# Yelp Top Cuisines
+cuisines_list = [
+    "American", "Chinese", "Mexican", "Italian", "Japanese", "Indian", "Thai", "Mediterranean",
+    "French", "Greek", "Korean", "Vietnamese", "Spanish", "Brazilian", "Middle Eastern", "Other"
+]
 
-# Function to fetch latitude and longitude from an address using Google Geocoding API
-def get_lat_lng_from_address(address):
-    geocode_url = "https://maps.googleapis.com/maps/api/geocode/json"
-    params = {"address": address, "key": google_api_key}
-    response = requests.get(geocode_url, params=params)
+dietary_options = ["Vegetarian", "Gluten-Free", "Vegan", "Kosher", "Halal", "Other"]
 
-    if response.status_code != 200:
+def get_restaurants(location_input, dietary_restrictions=None, budget=None, distance=None, distance_unit='miles', cuisine=None, min_rating=None):
+    g = geocoder.arcgis(location_input)
+    if not g.latlng:
+        st.error("Invalid location. Please enter a valid address or ZIP code.")
         return None, None
+    location = f"{g.latlng[0]},{g.latlng[1]}"
 
-    data = response.json()
-    if data["status"] == "OK" and len(data["results"]) > 0:
-        location = data["results"][0]["geometry"]["location"]
-        return location["lat"], location["lng"]
+    # Convert distance to meters
+    if distance_unit == 'feet':
+        radius = min(int(distance * 0.3048), 40000)
     else:
-        return None, None
+        radius = min(int(distance * 1609.34), 40000)
 
-
-# Function to fetch restaurants from Google Places API
-def get_restaurants_google(location, radius, cuisine=None):
-    google_places_url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-    params = {
-        "location": location,
-        "radius": radius,
-        "type": "restaurant",
-        "key": google_api_key,
-    }
-
-    if cuisine:
-        params["keyword"] = cuisine
-
-    response = requests.get(google_places_url, params=params)
-
-    if response.status_code != 200:
-        return None
-
-    data = response.json()
-    results = data.get("results", [])
-    restaurants = []
-
-    for place in results:
-        name = place.get("name")
-        address = place.get("vicinity", "N/A")
-        lat = place["geometry"]["location"]["lat"]
-        lng = place["geometry"]["location"]["lng"]
-        place_id = place.get("place_id")
-
-        restaurants.append({
-            "name": name,
-            "address": address,
-            "coordinates": [lat, lng],
-            "place_id": place_id,
-        })
-
-    return restaurants
-
-
-# Function to enrich restaurant data with Yelp API
-def enrich_with_yelp_data(restaurants, dietary_restrictions=None, budget=None, min_rating=None):
     yelp_endpoint = "https://api.yelp.com/v3/businesses/search"
     headers = {"Authorization": f"Bearer {yelp_api_key}"}
-    enriched_restaurants = []
+    params = {
+        "location": location_input,
+        "categories": cuisine.lower().replace(" ", "_"),
+        "limit": 50,
+        "radius": radius,
+    }
 
-    for restaurant in restaurants:
-        name = restaurant["name"]
-        params = {
-            "term": name,
-            "latitude": restaurant["coordinates"][0],
-            "longitude": restaurant["coordinates"][1],
-            "limit": 1,
-        }
-        if budget:
-            params["price"] = budget
-        if dietary_restrictions:
-            params["attributes"] = ",".join(dietary_restrictions)
+    if dietary_restrictions:
+        params["term"] = ",".join(dietary_restrictions)
+    if budget:
+        params["price"] = budget
+    if cuisine and cuisine != "Other":
+        params["term"] = cuisine
 
-        response = requests.get(yelp_endpoint, headers=headers, params=params)
+    response = requests.get(yelp_endpoint, headers=headers, params=params)
+    if response.status_code != 200:
+        st.error("Error fetching restaurants. Please try again.")
+        return None, None
 
-        if response.status_code == 200:
-            data = response.json()
-            if data["businesses"]:
-                business = data["businesses"][0]
-                rating = business["rating"]
-                if min_rating and rating < min_rating:
-                    continue
-                image_url = business.get("image_url", "")
-                phone = business.get("display_phone", "N/A")
-                categories = ", ".join([cat["title"] for cat in business.get("categories", [])])
-                price = business.get("price", "N/A")  # Get price level ($, $$, $$$, $$$$)
+    data = response.json()
+    businesses = data.get("businesses", [])
+    restaurants = []
 
-                restaurant.update({
-                    "rating": rating,
-                    "image_url": image_url,
-                    "phone": phone,
-                    "categories": categories,
-                    "price": price,  # Include price information
-                })
-                enriched_restaurants.append(restaurant)
+    for business in businesses:
+        name = business["name"]
+        rating = business["rating"]
+        if min_rating and rating < min_rating:
+            continue
+        distance_m = business["distance"]
+        distance_ft = round(distance_m * 3.28084)
+        address = ", ".join(business["location"].get("display_address", []))
+        phone = business.get("display_phone", "N/A")
+        categories = ", ".join([cat["title"] for cat in business.get("categories", [])])
+        coordinates = [business["coordinates"]["latitude"], business["coordinates"]["longitude"]]
+        image_url = business.get("image_url", "")
 
-    return enriched_restaurants
+        restaurants.append((name, rating, address, phone, categories, coordinates, image_url, distance_ft))
 
-
-# Helper function to display restaurant details
-def display_restaurant(restaurant, index):
-    st.image(restaurant.get("image_url", ""), width=300, caption=restaurant["name"])
-    st.markdown(f"**{restaurant['name']}**")
-    st.write(f"Rating: {restaurant.get('rating', 'N/A')} stars")
-    st.write(f"Address: {restaurant['address']}")
-    st.write(f"Phone: {restaurant.get('phone', 'N/A')}")
-    st.write(f"Categories: {restaurant.get('categories', 'N/A')}")
-    st.write(f"Budget: {restaurant.get('price', 'N/A')}")  # Add budget line
-
-    # Generate Google Maps link
-    google_maps_url = f"https://www.google.com/maps/search/?api=1&query={restaurant['coordinates'][0]},{restaurant['coordinates'][1]}"
-
-    # Use a markdown hyperlink styled as a button
-    st.markdown(
-        f"""
-        <a href="{google_maps_url}" target="_blank">
-            <button style="background-color:#4CAF50; color:white; border:none; padding:10px 20px; text-align:center; font-size:14px; border-radius:5px; cursor:pointer;">
-                Open in Google Maps
-            </button>
-        </a>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-# Top 15 Cuisines (from Yelp)
-top_cuisines = [
-    "American", "Mexican", "Italian", "Chinese", "Japanese",
-    "Indian", "Thai", "Mediterranean", "French", "Korean",
-    "Vietnamese", "Spanish", "Middle Eastern", "Greek", "Caribbean"
-]
+    return restaurants, random.sample(restaurants, min(len(restaurants), 3))
 
 # Sidebar UI
 st.sidebar.header("Search Settings")
+location_input = st.sidebar.text_input("Enter your address or ZIP code:")
 
-# Address Input
-address = st.sidebar.text_input("Enter your address:")
-distance_feet = st.sidebar.slider("Distance (feet):", 500, 2500, 1000)
+distance_unit = st.sidebar.selectbox("Select Distance Unit:", ["miles", "feet"], index=0)
 
-# Preferred Cuisine Dropdown
-cuisine = st.sidebar.selectbox(
-    "Preferred Cuisine:",
-    options=["Anything"] + top_cuisines + ["Other"],
-    index=0
-)
-
-# Handle 'Anything' cuisine selection (randomize for each restaurant)
-cuisines_to_fetch = []
-if cuisine == "Anything":
-    cuisines_to_fetch = [random.choice(top_cuisines) for _ in range(3)]
-elif cuisine == "Other":
-    custom_cuisine = st.sidebar.text_input("Specify your preferred cuisine:")
-    cuisines_to_fetch = [custom_cuisine] * 3 if custom_cuisine else []
+if distance_unit == "miles":
+    distance = st.sidebar.slider("Distance (miles):", 0, 15, 5)
 else:
-    cuisines_to_fetch = [cuisine] * 3
+    distance = st.sidebar.slider("Distance (feet):", 0, 2500, 500, step=100)
 
-# Dietary restrictions
-dietary_options = ["Vegetarian", "Gluten-Free", "Vegan", "Peanut Allergy", "Kosher", "Halal", "Other"]
-selected_dietary = st.sidebar.multiselect("Dietary Restrictions:", dietary_options)
+dietary_selection = st.sidebar.selectbox("Dietary Restrictions:", dietary_options)
+if dietary_selection == "Other":
+    dietary_restrictions = st.sidebar.text_input("Enter your dietary restrictions:")
+    dietary_restrictions = [x.strip() for x in dietary_restrictions.split(",") if dietary_restrictions]
+else:
+    dietary_restrictions = [dietary_selection]
 
-# Handle 'Other' dietary restriction
-if "Other" in selected_dietary:
-    other_restriction = st.sidebar.text_input("Specify other restriction:")
-    if other_restriction:
-        selected_dietary.append(other_restriction)
-    selected_dietary.remove("Other")
+budget = st.sidebar.selectbox("Budget:", ["Cheap", "Moderate", "Expensive", "Luxury"], index=1)
+budget_map = {"Cheap": 1, "Moderate": 2, "Expensive": 3, "Luxury": 4}
+selected_budget = budget_map[budget]
 
-# Budget dropdown (using dollar signs)
-budget_map = {"$": 1, "$$": 2, "$$$": 3, "$$$$": 4}
-budget_options = ["Anything"] + list(budget_map.keys())
-selected_budget_label = st.sidebar.selectbox("Budget:", budget_options)
-
-# Handle 'Anything' budget selection (randomly choose)
-if selected_budget_label == "Anything":
-    selected_budget_label = random.choice(list(budget_map.keys()))
-
-selected_budget = budget_map.get(selected_budget_label, None)
+cuisine = st.sidebar.selectbox("Preferred cuisine:", cuisines_list)
+if cuisine == "Other":
+    cuisine = st.sidebar.text_input("Enter your preferred cuisine:")
 
 min_rating = st.sidebar.slider("Minimum Rating:", 1.0, 5.0, 4.0, step=0.5)
 
-# Find Restaurants button
+if "selected_restaurant" not in st.session_state:
+    st.session_state.selected_restaurant = None
+
+st.title(emoji.emojize("Welcome to Foodie :fork_and_knife_with_plate:"))
+st.write("Discover the best restaurants near you based on your preferences.")
+
 if st.sidebar.button("Find Restaurants"):
-    if address:
-        st.sidebar.write("Fetching location...")
-        lat, lng = get_lat_lng_from_address(address)
-        if lat and lng:
-            location = f"{lat},{lng}"
-            radius_meters = distance_feet * 0.3048
-
-            all_restaurants = []
-            for selected_cuisine in cuisines_to_fetch:
-                google_restaurants = get_restaurants_google(location, radius_meters, selected_cuisine)
-                if google_restaurants:
-                    random_restaurant = random.choice(google_restaurants)
-                    all_restaurants.append(random_restaurant)
-
-            if not all_restaurants:
-                st.error("No restaurants found matching your criteria.")
-            else:
-                enriched_restaurants = enrich_with_yelp_data(
-                    all_restaurants, selected_dietary, selected_budget, min_rating
-                )
-
-                if not enriched_restaurants:
-                    st.error("No restaurants found matching your criteria.")
-                else:
-                    st.header("Top Picks")
-                    for index, restaurant in enumerate(enriched_restaurants):
-                        display_restaurant(restaurant, index)
-
-                    # Display map
-                    st.header("Map View")
-                    m = folium.Map(location=[lat, lng], zoom_start=15)
-                    folium.Marker(location=[lat, lng], popup="You are here", icon=folium.Icon(color="blue")).add_to(m)
-                    for restaurant in enriched_restaurants:
-                        folium.Marker(location=restaurant["coordinates"], popup=restaurant["name"],
-                                      icon=folium.Icon(color="green")).add_to(m)
-                    folium_static(m)
+    with st.spinner("Searching for restaurants..."):
+        restaurants, top_picks = get_restaurants(location_input, dietary_restrictions, selected_budget, distance, distance_unit, cuisine, min_rating)
+        if not restaurants:
+            st.error("No restaurants found. Please try adjusting your filters.")
         else:
-            st.error("Unable to fetch location. Please check the address.")
-    else:
-        st.error("Please enter a valid address.")
+            st.header("Top Picks")
+            for index, restaurant in enumerate(top_picks):
+                st.image(restaurant[6], width=300, caption=restaurant[0])
+                st.markdown(f"**{restaurant[0]}**")
+                st.write(f"Rating: {restaurant[1]} stars")
+                st.write(f"Address: {restaurant[2]}")
+                st.write(f"Phone: {restaurant[3]}")
+                st.write(f"Categories: {restaurant[4]}")
+                st.write(f"Distance: {restaurant[7]} ft")
+
+            # Display map
+            st.header("Map View")
+            g = geocoder.arcgis(location_input)
+            if g.latlng:
+                m = folium.Map(location=[g.latlng[0], g.latlng[1]], zoom_start=13)
+                folium.Marker(location=[g.latlng[0], g.latlng[1]], popup="You are here", icon=folium.Icon(color="blue")).add_to(m)
+                for restaurant in top_picks:
+                    folium.Marker(location=restaurant[5], popup=restaurant[0], icon=folium.Icon(color="green")).add_to(m)
+                folium_static(m)
