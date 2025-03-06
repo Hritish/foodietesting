@@ -16,7 +16,7 @@ cuisines_list = [
     "French", "Greek", "Korean", "Vietnamese", "Spanish", "Brazilian", "Middle Eastern", "Other"
 ]
 
-dietary_options = ["Vegetarian", "Gluten-Free", "Vegan", "Kosher", "Halal", "Other"]
+dietary_options = ["N/A", "Vegetarian", "Gluten-Free", "Vegan", "Kosher", "Halal", "Other"]
 
 def get_restaurants(location_input, dietary_restrictions=None, budget=None, distance=None, distance_unit='miles', cuisine=None, min_rating=None):
     g = geocoder.arcgis(location_input)
@@ -85,7 +85,9 @@ else:
     distance = st.sidebar.slider("Distance (feet):", 0, 2500, 500, step=100)
 
 dietary_selection = st.sidebar.selectbox("Dietary Restrictions:", dietary_options)
-if dietary_selection == "Other":
+if dietary_selection == "N/A":
+    dietary_restrictions = None
+elif dietary_selection == "Other":
     dietary_restrictions = st.sidebar.text_input("Enter your dietary restrictions:")
     dietary_restrictions = [x.strip() for x in dietary_restrictions.split(",") if dietary_restrictions]
 else:
@@ -123,12 +125,12 @@ if st.sidebar.button("Find Restaurants"):
                 st.write(f"Categories: {restaurant[4]}")
                 st.write(f"Distance: {restaurant[7]} ft")
 
-            # Display map
-            st.header("Map View")
-            g = geocoder.arcgis(location_input)
-            if g.latlng:
-                m = folium.Map(location=[g.latlng[0], g.latlng[1]], zoom_start=13)
-                folium.Marker(location=[g.latlng[0], g.latlng[1]], popup="You are here", icon=folium.Icon(color="blue")).add_to(m)
-                for restaurant in top_picks:
-                    folium.Marker(location=restaurant[5], popup=restaurant[0], icon=folium.Icon(color="green")).add_to(m)
-                folium_static(m)
+if 'top_picks' in locals():
+    st.header("Map View")
+    g = geocoder.arcgis(location_input)
+    if g.latlng:
+        m = folium.Map(location=[g.latlng[0], g.latlng[1]], zoom_start=13)
+        folium.Marker(location=[g.latlng[0], g.latlng[1]], popup="You are here", icon=folium.Icon(color="blue")).add_to(m)
+        for restaurant in top_picks:
+            folium.Marker(location=restaurant[5], popup=restaurant[0], icon=folium.Icon(color="green")).add_to(m)
+        folium_static(m)
