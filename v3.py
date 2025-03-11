@@ -70,6 +70,7 @@ distance_unit = st.sidebar.selectbox("📏 Select Distance Unit:", ["miles", "fe
 distance = st.sidebar.slider(f"🛣️ Distance ({distance_unit}):", 0, 15 if distance_unit == "miles" else 2500,
                              5 if distance_unit == "miles" else 500)
 
+# Dietary Restrictions
 dietary_selection = st.sidebar.selectbox("🥗 Dietary Restrictions:", dietary_options)
 dietary_restrictions = None if dietary_selection == "N/A" else [
     dietary_selection] if dietary_selection != "Other" else st.sidebar.text_input(
@@ -83,32 +84,41 @@ cuisine = None if cuisine == "N/A" else cuisine if cuisine != "Other" else st.si
     "Enter your preferred cuisine:")
 
 st.title(emoji.emojize(":fork_and_knife_with_plate: Foodie - Find Your Perfect Meal!"))
-st.write("Discover the best restaurants near you based on your preferences. Foodie is currently in testing, so please bear with bugs. Foodie also works best on laptops. Made by Hritish.")
+st.write(
+    "Discover the best restaurants near you based on your preferences. Foodie is currently in testing, so please bear with bugs. Foodie also works best on laptops. Made by Hritish.")
 
 # Store global geolocation
 user_location = None
 
 
-# Yelp API Fetch Function
+# Yelp API Fetch Function (Improved Accuracy and Range Filtering)
 def get_restaurants():
     global user_location
     g = geocoder.arcgis(location_input)
     if not g.latlng:
         st.error("Invalid location. Please enter a valid address or ZIP code.")
         return None, None
-    user_location = g.latlng  # Store user location globally
+    user_location = g.latlng
 
-    radius = min(int(distance * (1609.34 if distance_unit == 'miles' else 0.3048)), 40000)
+    # Convert selected distance into meters (Yelp uses meters)
+    max_radius_meters = min(int(distance * (1609.34 if distance_unit == 'miles' else 0.3048)), 40000)
 
     yelp_endpoint = "https://api.yelp.com/v3/businesses/search"
     headers = {"Authorization": f"Bearer {yelp_api_key}"}
+
     params = {
         "location": location_input,
-        "categories": cuisine.lower().replace(" ", "_") if cuisine else "restaurant",
         "limit": 50,
-        "radius": radius,
+        "radius": max_radius_meters,
         "price": budget_map[budget]
     }
+
+    if cuisine:
+        params["categories"] = cuisine.lower().replace(" ", "_")
+        params["term"] = cuisine
+
+    if dietary_restrictions:
+        params["term"] += f", {', '.join(dietary_restrictions)}"
 
     response = requests.get(yelp_endpoint, headers=headers, params=params)
     if response.status_code != 200:
@@ -118,15 +128,21 @@ def get_restaurants():
     data = response.json()
     businesses = data.get("businesses", [])
 
-    restaurants = [
-        (b["name"], ", ".join(b["location"].get("display_address", [])),
-         b.get("display_phone", "N/A"), ", ".join([cat["title"] for cat in b.get("categories", [])]),
-         [b["coordinates"]["latitude"], b["coordinates"]["longitude"]], b.get("image_url", ""),
-         round(b["distance"] * 3.28084), b.get("url", "#"))
-        for b in businesses
-    ]
+    filtered_restaurants = []
+    for b in businesses:
+        actual_distance_meters = b["distance"]
 
-    return restaurants, random.sample(restaurants, min(len(restaurants), 3)) if restaurants else ([], [])
+        # **Only include restaurants within the selected range**
+        if actual_distance_meters <= max_radius_meters:
+            filtered_restaurants.append((
+                b["name"], ", ".join(b["location"].get("display_address", [])),
+                b.get("display_phone", "N/A"), ", ".join([cat["title"] for cat in b.get("categories", [])]),
+                [b["coordinates"]["latitude"], b["coordinates"]["longitude"]], b.get("image_url", ""),
+                round(actual_distance_meters * 3.28084), b.get("url", "#")
+            ))
+
+    return filtered_restaurants, random.sample(filtered_restaurants,
+                                               min(len(filtered_restaurants), 3)) if filtered_restaurants else ([], [])
 
 
 # Function to generate a fake AI-powered popularity score
@@ -161,15 +177,11 @@ if st.sidebar.button("🔍 Find Restaurants"):
                             st.progress(popularity_score / 100)
                             st.write(f"🔥 Popularity Score: **{popularity_score}%** (AI Prediction)")
 
-                    if idx < len(top_picks) - 1:
-                        st.markdown("<hr class='restaurant-divider'>", unsafe_allow_html=True)
-
             with tab2:
                 st.header("🗺️ Map View")
                 if top_picks and user_location:
                     m = folium.Map(location=user_location, zoom_start=13, tiles="cartodbpositron")
 
-                    # Keep user marker but remove popup
                     folium.Marker(location=user_location, icon=folium.Icon(color="blue")).add_to(m)
 
                     for r in top_picks:
@@ -177,5 +189,3 @@ if st.sidebar.button("🔍 Find Restaurants"):
                                       icon=folium.Icon(color="green")).add_to(m)
 
                     folium_static(m)
-                else:
-                    st.warning("No locations available.")
