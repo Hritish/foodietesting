@@ -85,7 +85,7 @@ cuisine = None if cuisine == "N/A" else cuisine if cuisine != "Other" else st.si
 
 st.title(emoji.emojize(":fork_and_knife_with_plate: Foodie - Find Your Perfect Meal!"))
 st.write(
-    "Discover the best restaurants near you based on your preferences. Foodie is currently in testing, so please bear with bugs. Foodie also works best on laptops. Made by Hritish.")
+    "Discover the best restaurants near you based on your preferences. Foodie is currently in testing, so please bear with bugs. Foodie also works best on laptops. Made by Hritish. Please reach out to hrit2001@gmail.com for any feedback or suggestions.")
 
 # Store global geolocation
 user_location = None
