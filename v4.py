@@ -34,12 +34,48 @@ dietary_options = ["N/A", "Vegetarian", "Gluten-Free", "Vegan", "Kosher", "Halal
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
-    body { font-family: 'Poppins', sans-serif !important; }
-    .stSidebar { background-color: #F8F9FA; padding: 20px; }
-    h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', sans-serif; font-weight: 600; }
-    .stButton > button { background-color: #FF4B4B !important; color: white !important; padding: 10px; border-radius: 10px; transition: transform 0.3s ease; }
-    .stButton > button:hover { transform: scale(1.05); background-color: #FF6347 !important; }
-    .restaurant-divider { margin-top: 20px; margin-bottom: 20px; border: none; height: 2px; background: #FF4B4B; }
+
+    /* Force Light Mode */
+    html, body, [data-testid="stAppViewContainer"] {
+        background-color: #FFFFFF !important;
+        color: black !important;
+    }
+
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background-color: #F8F9FA !important; /* Light Gray */
+    }
+    [data-testid="stSidebar"] * {
+        color: black !important; /* Ensure all sidebar text is visible */
+    }
+
+    /* General Styling */
+    h1, h2, h3, h4, h5, h6 { 
+        font-family: 'Poppins', sans-serif; 
+        font-weight: 600;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        padding: 10px;
+        border-radius: 10px;
+        transition: transform 0.3s ease;
+    }
+    .stButton > button:hover {
+        transform: scale(1.05);
+        background-color: #FF6347 !important; /* Tomato Red Hover */
+    }
+
+    /* Divider */
+    .restaurant-divider {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        border: none;
+        height: 2px;
+        background: #FF4B4B; /* Red Line */
+    }
     </style>
 """, unsafe_allow_html=True)
 
