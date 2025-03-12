@@ -34,8 +34,8 @@ dietary_options = ["N/A", "Vegetarian", "Gluten-Free", "Vegan", "Kosher", "Halal
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
-
-    /* Force Light Mode */
+    
+    /* Force Light Mode (Fix iOS/macOS Dark Mode Issues) */
     html, body, [data-testid="stAppViewContainer"] {
         background-color: #FFFFFF !important;
         color: black !important;
@@ -49,10 +49,23 @@ st.markdown("""
         color: black !important; /* Ensure all sidebar text is visible */
     }
 
+    /* Fix: Ensure Text Input Fields & Dropdowns are Always Visible */
+    input, select, textarea, .stTextInput, .stSelectbox, .stSlider {
+        background-color: white !important;
+        color: black !important;
+        border: 1px solid #ccc !important;
+    }
+
+    /* Fix: Ensure Tabs (List View, Map View) Are Visible */
+    div[data-baseweb="tab"] {
+        color: black !important;
+    }
+
     /* General Styling */
     h1, h2, h3, h4, h5, h6 { 
         font-family: 'Poppins', sans-serif; 
         font-weight: 600;
+        color: black !important;
     }
 
     /* Buttons */
@@ -78,6 +91,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # **New Feature: Pick a Northeast City for Iconic Food**
 selected_city = st.sidebar.selectbox("🏙️ Want to Explore Famous Food in a City?",
