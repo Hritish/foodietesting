@@ -93,7 +93,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# **New Feature: Pick a Northeast City for Iconic Food**
+
 selected_city = st.sidebar.selectbox("🏙️ Want to Explore Famous Food in a City?",
                                      ["N/A"] + list(northeast_city_food_map.keys()))
 if selected_city != "N/A":
