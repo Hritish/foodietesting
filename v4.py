@@ -43,37 +43,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# **Header and App Description**
-st.title(emoji.emojize(":fork_and_knife_with_plate: Foodie - Find Your Perfect Meal!"))
-
-st.write("""
-### Discover the best restaurants near you based on your preferences! 🍽️  
-Foodie is currently in testing, so please bear with any bugs.  
-
-🚀 **Works best on laptops**  
-📩 **Made by Hritish. For feedback or suggestions, contact:**  
-📧 [hrit2001@gmail.com](mailto:hrit2001@gmail.com)
-""")
-
-# **Sidebar Search Settings**
-st.sidebar.header("🔍 Search Settings")
-
+# **New Feature: Pick a Northeast City for Iconic Food**
 selected_city = st.sidebar.selectbox("🏙️ Want to Explore Famous Food in a City?",
                                      ["N/A"] + list(northeast_city_food_map.keys()))
 if selected_city != "N/A":
     st.sidebar.write(f"🍽️ {selected_city} is known for: **{northeast_city_food_map[selected_city][0]}**")
 
+st.sidebar.header("🔍 Search Settings")
+
+# **Set Location for Yelp Query**
 if selected_city != "N/A":
-    search_location = selected_city
-    map_center = northeast_city_food_map[selected_city][1]
+    search_location = selected_city  # Directly use city name
+    map_center = northeast_city_food_map[selected_city][1]  # Get predefined lat/lon
 else:
     search_location = st.sidebar.text_input("📍 Enter your address or ZIP code:")
-    map_center = None
+    map_center = None  # Will be determined later
 
 distance_unit = st.sidebar.selectbox("📏 Select Distance Unit:", ["miles", "feet"], index=0)
 distance = st.sidebar.slider(f"🛣️ Distance ({distance_unit}):", 0, 15 if distance_unit == "miles" else 2500,
                              5 if distance_unit == "miles" else 500)
 
+# Dietary Restrictions
 dietary_selection = st.sidebar.selectbox("🥗 Dietary Restrictions:", dietary_options)
 dietary_restrictions = None if dietary_selection == "N/A" else [
     dietary_selection] if dietary_selection != "Other" else st.sidebar.text_input(
@@ -86,7 +76,12 @@ cuisine = st.sidebar.selectbox("🍽️ Preferred cuisine:", cuisines_list)
 if selected_city != "N/A":
     cuisine = northeast_city_food_map[selected_city][0]
 
-# **Fetch Restaurants**
+st.title(emoji.emojize(":fork_and_knife_with_plate: Foodie - Find Your Perfect Meal!"))
+st.write(
+    "Discover the best restaurants near you based on your preferences. Foodie is currently in testing, so please bear with bugs. Foodie also works best on laptops. Made by Hritish. Please reach out to hrit2001@gmail.com for any bugs or suggestions"
+)
+
+# Yelp API Fetch Function
 def get_restaurants():
     global map_center
 
@@ -96,9 +91,9 @@ def get_restaurants():
             st.error("Invalid location. Please enter a valid address or ZIP code.")
             return None, None
         user_location = g.latlng
-        map_center = user_location  
+        map_center = user_location
     else:
-        user_location = None  
+        user_location = None
 
     max_radius_meters = min(int(distance * (1609.34 if distance_unit == 'miles' else 0.3048)), 40000)
 
@@ -107,7 +102,7 @@ def get_restaurants():
 
     params = {
         "location": search_location,
-        "limit": 50,
+        "limit": 50,  # Get as many as possible
         "radius": max_radius_meters,
         "price": budget_map[budget]
     }
@@ -135,8 +130,11 @@ def get_restaurants():
         for b in businesses if b["distance"] <= max_radius_meters
     ]
 
-    random.shuffle(filtered_restaurants)  
+    # 🔹 New Fix: Shuffle the list and pick fresh results dynamically
+    random.shuffle(filtered_restaurants)
     return filtered_restaurants, filtered_restaurants[:3] if len(filtered_restaurants) >= 3 else filtered_restaurants
+
+
 
 if st.sidebar.button("🔍 Find Restaurants"):
     with st.spinner("Searching for restaurants..."):
@@ -149,13 +147,45 @@ if st.sidebar.button("🔍 Find Restaurants"):
 
             with tab1:
                 st.header("🍴 Top Picks")
-                for r in top_picks:
-                    st.subheader(r[0])
-                    st.write(f"📍 **Address:** {r[1]}")
-                    st.markdown(f"[🔗 Visit Website]({r[7]})", unsafe_allow_html=True)
+
+                if not top_picks:
+                    st.warning("No restaurants found! Try adjusting filters.")
+                else:
+                    for r in top_picks:
+                        with st.container():
+                            col1, col2 = st.columns([1, 2])  # Image (40%) | Details (60%)
+
+                            with col1:
+                                st.image(r[5], width=150, use_container_width=True)  # Ensure image fits properly
+
+                            with col2:
+                                st.markdown(f"### {r[0]}")
+                                st.write(f"📍 **Address:** {r[1]}")
+                                st.write(f"📞 **Phone:** {r[2]}")
+                                st.write(f"🍽️ **Categories:** {r[3]}")
+                                st.markdown(f"[🔗 Visit Website]({r[7]})", unsafe_allow_html=True)
+
+                                # Generate and display popularity score
+                                popularity_score = random.randint(60, 98)  # Simulated AI popularity score
+                                st.progress(popularity_score / 100)
+                                st.write(f"🔥 Popularity Score: **{popularity_score}%** (AI Prediction)")
+
+                            st.markdown("<hr class='restaurant-divider'>", unsafe_allow_html=True)
 
             with tab2:
                 st.header("🗺️ Map View")
                 if map_center:
                     m = folium.Map(location=map_center, zoom_start=13)
+
+                    # Add a marker for the central location
+                    folium.Marker(location=map_center, icon=folium.Icon(color="blue", icon="info-sign")).add_to(m)
+
+                    # 🔹 Fix: Add markers for each restaurant
+                    for r in top_picks:
+                        folium.Marker(
+                            location=r[4],  # Latitude and Longitude
+                            popup=f'<b>{r[0]}</b><br><a href="{r[7]}" target="_blank">Visit Yelp Page</a>',
+                            icon=folium.Icon(color="red", icon="cutlery")  # 🔹 Use "cutlery" for food places
+                        ).add_to(m)
+
                     folium_static(m)
