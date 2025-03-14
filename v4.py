@@ -34,38 +34,70 @@ dietary_options = ["N/A", "Vegetarian", "Gluten-Free", "Vegan", "Kosher", "Halal
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
-    
-    /* Force Light Mode */
+
+    /* Dark Theme */
     html, body, [data-testid="stAppViewContainer"] {
-        background-color: #FFFFFF !important;
-        color: black !important;
+        background-color: #121212 !important;  /* Dark background */
+        color: white !important;  /* White text */
     }
 
-    /* Sidebar Styling */
+    /* Sidebar */
     [data-testid="stSidebar"] {
-        background-color: #F8F9FA !important; /* Light Gray */
+        background-color: #1E1E1E !important; /* Dark Gray Sidebar */
     }
     [data-testid="stSidebar"] * {
-        color: black !important; /* Ensure all sidebar text is visible */
+        color: white !important; /* White Sidebar Text */
     }
 
-    /* General Styling */
-    h1, h2, h3, h4, h5, h6 { 
-        font-family: 'Poppins', sans-serif; 
-        font-weight: 600;
+    /* Fix Input Fields in Sidebar */
+    input[type="text"], textarea, select {
+        background-color: #2B2B2B !important; /* Slightly lighter dark */
+        color: white !important; /* White Text */
+        border: none !important; /* Remove borders */
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    /* Remove Focus Highlight */
+    input:focus, select:focus, textarea:focus {
+        outline: none !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    /* Fix Dropdowns */
+    [role="combobox"], .stSelectbox div {
+        background-color: #2B2B2B !important;
+        color: white !important;
+        border: none !important;
+    }
+
+    /* Fix Slider */
+    .stSlider div[role="slider"] {
+        background-color: #FF8000 !important; /* Orange Slider */
     }
 
     /* Buttons */
     .stButton > button {
-        background-color: #FF4B4B !important;
-        color: white !important;
+        background-color: #FF8000 !important; /* Orange */
+        color: black !important;
         padding: 10px;
         border-radius: 10px;
         transition: transform 0.3s ease;
     }
     .stButton > button:hover {
         transform: scale(1.05);
-        background-color: #FF6347 !important; /* Tomato Red Hover */
+        background-color: #FFA500 !important; /* Lighter Orange */
+    }
+
+    /* Restaurant Cards */
+    .restaurant-card {
+        background-color: #1E1E1E !important; /* Dark Gray */
+        border-radius: 12px;
+        padding: 15px;
+        margin: 10px;
+        box-shadow: 0px 4px 6px rgba(255, 165, 0, 0.3); /* Orange Glow */
+        color: white !important;
     }
 
     /* Divider */
@@ -74,7 +106,7 @@ st.markdown("""
         margin-bottom: 20px;
         border: none;
         height: 2px;
-        background: #FF4B4B; /* Red Line */
+        background: #FF8000; /* Orange Line */
     }
     </style>
 """, unsafe_allow_html=True)
