@@ -143,7 +143,8 @@ budget = st.sidebar.selectbox("💰 Budget:", list(budget_map.keys()), index=1)
 
 cuisine_selection = st.sidebar.selectbox("🍽️ Preferred cuisine:", cuisines_list)
 cuisine_restrictions = None if cuisine_selection == "N/A" else [
-    cuisine_selection] if cuisine_selection != "Other" else st.sidebar.text_input("Enter your preferred cuisine:"_.split(",")
+    cuisine_selection] if cuisine_selection != "Other" else st.sidebar.text_input(
+        "Enter your preferred cuisine:").split(",")
                                                                                   
 if selected_city != "N/A":
     cuisine = northeast_city_food_map[selected_city][0]
