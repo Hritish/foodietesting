@@ -181,10 +181,6 @@ def get_restaurants():
         "price": budget_map[budget]
     }
 
-    if cuisine:
-        params["categories"] = cuisine.lower().replace(" ", "_")
-        params["term"] = cuisine
-
     if dietary_restrictions:
         params["term"] += f", {', '.join(dietary_restrictions)}"
 
