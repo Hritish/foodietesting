@@ -141,14 +141,9 @@ dietary_restrictions = None if dietary_selection == "N/A" else [
 budget_map = {"Cheap": 1, "Moderate": 2, "Expensive": 3, "Luxury": 4}
 budget = st.sidebar.selectbox("💰 Budget:", list(budget_map.keys()), index=1)
 
-cuisine_selection = st.sidebar.selectbox("🍽️ Preferred cuisine:", cuisines_list)
-cuisine_restrictions = None if cuisine_selection == "N/A" else [
-    cuisine_selection] if cuisine_selection != "Other" else st.sidebar.text_input(
-        "Enter your preferred cuisine:").split(",")
-                                                                                  
+cuisine = st.sidebar.selectbox("🍽️ Preferred cuisine:", cuisines_list)
 if selected_city != "N/A":
     cuisine = northeast_city_food_map[selected_city][0]
-
 
 st.title(emoji.emojize(":fork_and_knife_with_plate: Foodie - Find Your Perfect Meal!"))
 st.write(
@@ -181,11 +176,12 @@ def get_restaurants():
         "price": budget_map[budget]
     }
 
+    if cuisine:
+        params["categories"] = cuisine.lower().replace(" ", "_")
+        params["term"] = cuisine
+
     if dietary_restrictions:
         params["term"] += f", {', '.join(dietary_restrictions)}"
-
-    if cuisine_restriction:
-        params["term"] += f", {', '.join(cuisine_restrictions)}"
 
     response = requests.get(yelp_endpoint, headers=headers, params=params)
     if response.status_code != 200:
