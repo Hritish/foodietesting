@@ -1,13 +1,17 @@
+import streamlit as st
 import requests
 import random
-import streamlit as st
+import geocoder
 import folium
 from streamlit_folium import folium_static
-import emoji
-import geocoder  # Used only for manual location input
+from db import SessionLocal, SavedRestaurant
+from auth import login_user, register_user
+
+# Initialize DB session
+db = SessionLocal()
 
 # Yelp API Key
-yelp_api_key = "8V0wD0XaZNVI7vNZ4wBoDyWs_CR7jUemUzrGjlYfB6vnquwXf2fvTKH9-lW-s9F6viimgNrbF8hR-VQlt-f3ZL1cIRvkXfDKftN04GxUOv40TDqjFjiouQOnkjo8ZHYx"
+yelp_api_key = "YOUR_YELP_API_KEY"
 
 # **Northeast US Cities and Their Iconic Dishes**
 northeast_city_food_map = {
@@ -17,126 +21,64 @@ northeast_city_food_map = {
     "Buffalo, NY": ("Buffalo Wings", (42.8864, -78.8784)),
     "Providence, RI": ("Stuffies", (41.8236, -71.4222)),
     "Portland, ME": ("Lobster Rolls", (43.6591, -70.2568)),
-    "Hartford, CT": ("Steamed Cheeseburgers", (41.7658, -72.6734)),
     "Baltimore, MD": ("Crab Cakes", (39.2904, -76.6122)),
     "New Haven, CT": ("Pizza", (41.3083, -72.9279)),
     "Jersey City, NJ": ("Bagels", (40.7178, -74.0431))
 }
 
-# Yelp Top Cuisines
 cuisines_list = ["N/A", "American", "Chinese", "Mexican", "Italian", "Japanese", "Indian", "Thai",
                  "Mediterranean", "French", "Greek", "Korean", "Vietnamese", "Spanish", "Brazilian",
                  "Middle Eastern", "Other"]
 
 dietary_options = ["N/A", "Vegetarian", "Gluten-Free", "Vegan", "Kosher", "Halal", "Other"]
 
-# **UI Styling**
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+# --- TITLE ---
+st.title("🍽️ Foodie - Find Your Perfect Meal!")
 
-    /* Dark Theme */
-    html, body, [data-testid="stAppViewContainer"] {
-        background-color: #121212 !important;  /* Dark background */
-        color: white !important;  /* White text */
-    }
+# --- AUTH SIDEBAR ---
+st.sidebar.header("🔐 Account")
 
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #1E1E1E !important; /* Dark Gray Sidebar */
-    }
-    [data-testid="stSidebar"] * {
-        color: white !important; /* White Sidebar Text */
-    }
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-    /* Fix Input Fields in Sidebar */
-    input[type="text"], textarea, select {
-        background-color: #2B2B2B !important; /* Slightly lighter dark */
-        color: white !important; /* White Text */
-        border: none !important; /* Remove borders */
-        border-radius: 8px;
-        padding: 10px;
-    }
+auth_mode = st.sidebar.radio("Login or Register:", ["Login", "Register"])
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
 
-    /* Remove Focus Highlight */
-    input:focus, select:focus, textarea:focus {
-        outline: none !important;
-        box-shadow: none !important;
-        border: none !important;
-    }
+if st.sidebar.button("Submit"):
+    if auth_mode == "Register":
+        result = register_user(db, username, password)
+        st.sidebar.success(result)
+    else:
+        user = login_user(db, username, password)
+        if user:
+            st.session_state.user = user
+            st.sidebar.success(f"Logged in as {user.username}")
+        else:
+            st.sidebar.error("Login failed")
 
-    /* Fix Dropdowns */
-    [role="combobox"], .stSelectbox div {
-        background-color: #2B2B2B !important;
-        color: white !important;
-        border: none !important;
-    }
-
-    /* Fix Slider */
-    .stSlider div[role="slider"] {
-        background-color: #FF8000 !important; /* Orange Slider */
-    }
-
-    /* Buttons */
-    .stButton > button {
-        background-color: #FF8000 !important; /* Orange */
-        color: black !important;
-        padding: 10px;
-        border-radius: 10px;
-        transition: transform 0.3s ease;
-    }
-    .stButton > button:hover {
-        transform: scale(1.05);
-        background-color: #FFA500 !important; /* Lighter Orange */
-    }
-
-    /* Restaurant Cards */
-    .restaurant-card {
-        background-color: #1E1E1E !important; /* Dark Gray */
-        border-radius: 12px;
-        padding: 15px;
-        margin: 10px;
-        box-shadow: 0px 4px 6px rgba(255, 165, 0, 0.3); /* Orange Glow */
-        color: white !important;
-    }
-
-    /* Divider */
-    .restaurant-divider {
-        margin-top: 20px;
-        margin-bottom: 20px;
-        border: none;
-        height: 2px;
-        background: #FF8000; /* Orange Line */
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-
-
-selected_city = st.sidebar.selectbox("🏙️ Want to Explore Famous Food in a City?",
-                                     ["N/A"] + list(northeast_city_food_map.keys()))
-if selected_city != "N/A":
-    st.sidebar.write(f"🍽️ {selected_city} is known for: **{northeast_city_food_map[selected_city][0]}**")
-
+# --- SEARCH OPTIONS ---
 st.sidebar.header("🔍 Search Settings")
 
-# **Set Location for Yelp Query**
-if selected_city != "N/A":
-    search_location = selected_city  # Directly use city name
-    map_center = northeast_city_food_map[selected_city][1]  # Get predefined lat/lon
-else:
-    search_location = st.sidebar.text_input("📍 Enter your address or ZIP code:")
-    map_center = None  # Will be determined later
+selected_city = st.sidebar.selectbox("🏙️ Explore a City?", ["N/A"] + list(northeast_city_food_map.keys()))
 
-distance_unit = st.sidebar.selectbox("📏 Select Distance Unit:", ["miles", "feet"], index=0)
-distance = st.sidebar.slider(f"🛣️ Distance ({distance_unit}):", 0, 15 if distance_unit == "miles" else 2500,
+if selected_city != "N/A":
+    st.sidebar.write(f"🍽️ {selected_city} is known for: **{northeast_city_food_map[selected_city][0]}**")
+    search_location = selected_city
+    map_center = northeast_city_food_map[selected_city][1]
+    disable_address_input = True
+else:
+    search_location = st.sidebar.text_input("📍 Enter address or ZIP code:")
+    map_center = None
+    disable_address_input = False
+
+distance_unit = st.sidebar.selectbox("📏 Distance Unit:", ["miles", "feet"])
+distance = st.sidebar.slider("🛣️ Distance:", 0, 15 if distance_unit == "miles" else 2500,
                              5 if distance_unit == "miles" else 500)
 
-# Dietary Restrictions
 dietary_selection = st.sidebar.selectbox("🥗 Dietary Restrictions:", dietary_options)
-dietary_restrictions = None if dietary_selection == "N/A" else [
-    dietary_selection] if dietary_selection != "Other" else st.sidebar.text_input(
-    "Enter your dietary restrictions:").split(",")
+dietary_restrictions = None if dietary_selection == "N/A" else [dietary_selection] if dietary_selection != "Other" else \
+    st.sidebar.text_input("Enter your dietary restrictions:").split(",")
 
 budget_map = {"Cheap": 1, "Moderate": 2, "Expensive": 3, "Luxury": 4}
 budget = st.sidebar.selectbox("💰 Budget:", list(budget_map.keys()), index=1)
@@ -145,19 +87,14 @@ cuisine = st.sidebar.selectbox("🍽️ Preferred cuisine:", cuisines_list)
 if selected_city != "N/A":
     cuisine = northeast_city_food_map[selected_city][0]
 
-st.title(emoji.emojize(":fork_and_knife_with_plate: Foodie - Find Your Perfect Meal!"))
-st.write(
-    "Discover the best restaurants near you based on your preferences. Foodie is currently in testing, so please bear with bugs. Foodie also works best on laptops. Made by Hritish. Please reach out to hrit2001@gmail.com for any bugs or suggestions"
-)
-
-# Yelp API Fetch Function
+# --- SEARCH FUNCTION ---
 def get_restaurants():
     global map_center
 
     if selected_city == "N/A":
         g = geocoder.arcgis(search_location)
         if not g.latlng:
-            st.error("Invalid location. Please enter a valid address or ZIP code.")
+            st.error("Invalid location.")
             return None, None
         user_location = g.latlng
         map_center = user_location
@@ -166,12 +103,10 @@ def get_restaurants():
 
     max_radius_meters = min(int(distance * (1609.34 if distance_unit == 'miles' else 0.3048)), 40000)
 
-    yelp_endpoint = "https://api.yelp.com/v3/businesses/search"
     headers = {"Authorization": f"Bearer {yelp_api_key}"}
-
     params = {
         "location": search_location,
-        "limit": 50,  # Get as many as possible
+        "limit": 50,
         "radius": max_radius_meters,
         "price": budget_map[budget]
     }
@@ -183,78 +118,102 @@ def get_restaurants():
     if dietary_restrictions:
         params["term"] += f", {', '.join(dietary_restrictions)}"
 
-    response = requests.get(yelp_endpoint, headers=headers, params=params)
+    response = requests.get("https://api.yelp.com/v3/businesses/search", headers=headers, params=params)
     if response.status_code != 200:
-        st.error("Error fetching restaurants. Please try again.")
+        st.error("Yelp API Error")
         return None, None
 
-    data = response.json()
-    businesses = data.get("businesses", [])
+    data = response.json().get("businesses", [])
 
-    filtered_restaurants = [
-        (b["name"], ", ".join(b["location"].get("display_address", [])),
-         b.get("display_phone", "N/A"), ", ".join([cat["title"] for cat in b.get("categories", [])]),
-         [b["coordinates"]["latitude"], b["coordinates"]["longitude"]], b.get("image_url", ""),
-         round(b["distance"] * 3.28084), b.get("url", "#"))
-        for b in businesses if b["distance"] <= max_radius_meters
-    ]
+    blocked_categories = {
+        "liquorstores", "wineries", "breweries", "distilleries",
+        "hair", "barbers", "massage", "spas", "tattooshops",
+        "nail_salons", "tanning", "piercing", "gyms"
+    }
 
-    # 🔹 New Fix: Shuffle the list and pick fresh results dynamically
-    random.shuffle(filtered_restaurants)
-    return filtered_restaurants, filtered_restaurants[:3] if len(filtered_restaurants) >= 3 else filtered_restaurants
+    filtered = []
+    for b in data:
+        cats = {cat["alias"] for cat in b.get("categories", [])}
+        if cats.intersection(blocked_categories):
+            continue
 
+        filtered.append((
+            b["id"], b["name"], ", ".join(b["location"].get("display_address", [])),
+            b.get("display_phone", "N/A"),
+            ", ".join([cat["title"] for cat in b.get("categories", [])]),
+            [b["coordinates"]["latitude"], b["coordinates"]["longitude"]],
+            b.get("image_url", ""), round(b["distance"] * 3.28084),
+            b.get("url", "#")
+        ))
 
+    random.shuffle(filtered)
+    return filtered, filtered[:3] if len(filtered) >= 3 else filtered
 
+# --- SEARCH BUTTON ---
 if st.sidebar.button("🔍 Find Restaurants"):
-    with st.spinner("Searching for restaurants..."):
+    with st.spinner("Searching..."):
         restaurants, top_picks = get_restaurants()
 
-        if not restaurants:
-            st.error("No restaurants found. Try adjusting your filters.")
-        else:
-            tab1, tab2 = st.tabs(["📋 List View", "🗺️ Map View"])
+    if not restaurants:
+        st.error("No restaurants found.")
+    else:
+        tab1, tab2 = st.tabs(["📋 List View", "🗺️ Map View"])
 
-            with tab1:
-                st.header("🍴 Top Picks")
+        with tab1:
+            st.header("🍴 Top Picks")
+            for r in top_picks:
+                with st.container():
+                    col1, col2 = st.columns([1, 2])
 
-                if not top_picks:
-                    st.warning("No restaurants found! Try adjusting filters.")
-                else:
-                    for r in top_picks:
-                        with st.container():
-                            col1, col2 = st.columns([1, 2])  # Image (40%) | Details (60%)
+                    with col1:
+                        st.image(r[6], width=150)
 
-                            with col1:
-                                st.image(r[5], width=150, use_container_width=True)  # Ensure image fits properly
+                    with col2:
+                        st.markdown(f"### {r[1]}")
+                        st.write(f"📍 **Address:** {r[2]}")
+                        st.write(f"📞 **Phone:** {r[3]}")
+                        st.write(f"🍽️ **Categories:** {r[4]}")
+                        st.markdown(f"[🔗 Visit Website]({r[8]})", unsafe_allow_html=True)
 
-                            with col2:
-                                st.markdown(f"### {r[0]}")
-                                st.write(f"📍 **Address:** {r[1]}")
-                                st.write(f"📞 **Phone:** {r[2]}")
-                                st.write(f"🍽️ **Categories:** {r[3]}")
-                                st.markdown(f"[🔗 Visit Website]({r[7]})", unsafe_allow_html=True)
+                        popularity = random.randint(60, 98)
+                        st.progress(popularity / 100)
+                        st.write(f"🔥 Popularity Score: **{popularity}%**")
 
-                                # Generate and display popularity score
-                                popularity_score = random.randint(60, 98)  # Simulated AI popularity score
-                                st.progress(popularity_score / 100)
-                                st.write(f"🔥 Popularity Score: **{popularity_score}%** (AI Prediction)")
+                        # Save button
+                        if st.session_state.user:
+                            if st.button("💾 Save", key=r[0]):
+                                exists = db.query(SavedRestaurant).filter_by(user_id=st.session_state.user.id, yelp_id=r[0]).first()
+                                if not exists:
+                                    db.add(SavedRestaurant(user_id=st.session_state.user.id, yelp_id=r[0], name=r[1], image_url=r[6], url=r[8]))
+                                    db.commit()
+                                    st.success("Saved!")
+                        else:
+                            st.info("Login to save this restaurant")
 
-                            st.markdown("<hr class='restaurant-divider'>", unsafe_allow_html=True)
+        with tab2:
+            st.header("🗺️ Map View")
+            if map_center:
+                m = folium.Map(location=map_center, zoom_start=13)
+                folium.Marker(location=map_center, icon=folium.Icon(color="blue", icon="info-sign")).add_to(m)
 
-            with tab2:
-                st.header("🗺️ Map View")
-                if map_center:
-                    m = folium.Map(location=map_center, zoom_start=13)
+                for r in top_picks:
+                    folium.Marker(
+                        location=r[5],
+                        popup=f'<b>{r[1]}</b><br><a href="{r[8]}" target="_blank">Visit Yelp Page</a>',
+                        icon=folium.Icon(color="red", icon="cutlery")
+                    ).add_to(m)
 
-                    # Add a marker for the central location
-                    folium.Marker(location=map_center, icon=folium.Icon(color="blue", icon="info-sign")).add_to(m)
+                folium_static(m)
 
-                    # 🔹 Fix: Add markers for each restaurant
-                    for r in top_picks:
-                        folium.Marker(
-                            location=r[4],  # Latitude and Longitude
-                            popup=f'<b>{r[0]}</b><br><a href="{r[7]}" target="_blank">Visit Yelp Page</a>',
-                            icon=folium.Icon(color="red", icon="cutlery")  # 🔹 Use "cutlery" for food places
-                        ).add_to(m)
-
-                    folium_static(m)
+# --- SAVED RESTAURANTS ---
+if st.session_state.user:
+    st.header("❤️ My Saved Restaurants")
+    saved = db.query(SavedRestaurant).filter_by(user_id=st.session_state.user.id).all()
+    if saved:
+        for r in saved:
+            with st.container():
+                st.image(r.image_url, width=100)
+                st.markdown(f"### {r.name}")
+                st.markdown(f"[🔗 Visit Website]({r.url})", unsafe_allow_html=True)
+    else:
+        st.info("No saved restaurants yet.")
