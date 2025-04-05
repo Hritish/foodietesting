@@ -1,6 +1,7 @@
 streamlit
+bcrypt
+sqlalchemy
+requests
 geocoder
 folium
 streamlit-folium
-requests
-emoji
