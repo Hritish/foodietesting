@@ -11,7 +11,7 @@ from auth import login_user, register_user
 db = SessionLocal()
 
 # Yelp API Key
-yelp_api_key = "YOUR_YELP_API_KEY"
+yelp_api_key = "8V0wD0XaZNVI7vNZ4wBoDyWs_CR7jUemUzrGjlYfB6vnquwXf2fvTKH9-lW-s9F6viimgNrbF8hR-VQlt-f3ZL1cIRvkXfDKftN04GxUOv40TDqjFjiouQOnkjo8ZHYx"
 
 # **Northeast US Cities and Their Iconic Dishes**
 northeast_city_food_map = {
