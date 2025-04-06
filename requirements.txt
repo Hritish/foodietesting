@@ -5,3 +5,4 @@ requests
 geocoder
 folium
 streamlit-folium
+emoji
